@@ -1,6 +1,6 @@
 USE [JSL_HSM_DB]
 GO
-/****** Object:  StoredProcedure [dbo].[Insert_Slab_Master]    Script Date: 4/9/2026 12:57:00 PM ******/
+/****** Object:  StoredProcedure [dbo].[Insert_Slab_Master]    Script Date: 4/9/2026 1:15:41 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -77,6 +77,11 @@ BEGIN
             (UploadBatchID, Upload_Date, SlabID, PlateMode, FurnaceNo, ColdSlabFlag, Status)
             VALUES
             (@UploadBatchID, SYSDATETIME(), @SlabId, @PlateModeInt, @FurnaceNo, @ColdSlabFlagInt, 0);
+
+			--INSERT INTO [dbo].[Slab_Upload_Master_L2]
+			--(SlabID, Upload_Date, Status)
+			--values
+			--(@SlabId, SYSDATETIME(), 1);
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
@@ -86,3 +91,25 @@ BEGIN
         SET @Msg  = ERROR_MESSAGE();
         RETURN;
     END CATCH
+
+    -- ✅ Step 2: Remote insert OUTSIDE transaction
+    -- Local is already committed — remote failure will not affect it
+    BEGIN TRY
+        IF NOT EXISTS (
+            SELECT 1 FROM [10.7.82.180].[HSM_LMS_DB].[dbo].[Slab_Upload_Master] WITH (NOLOCK)
+            WHERE SlabID = @SlabId
+        )
+        BEGIN
+            INSERT INTO [10.7.82.180].[HSM_LMS_DB].[dbo].[Slab_Upload_Master] 
+            (SlabID, Upload_Date, Status)
+            VALUES (@SlabId, GETDATE(), 1);
+        END
+    END TRY
+    BEGIN CATCH
+        -- Remote insert failed — local is already saved safely
+        -- Optionally log: INSERT INTO dbo.SyncErrors (SlabID, ErrorMsg) VALUES (@SlabId, ERROR_MESSAGE())
+    END CATCH
+
+    SET @Code = 200;
+    SET @Msg  = 'Slab inserted successfully';
+END
