@@ -176,3 +176,20 @@ BEGIN
    --     WHERE p.SLABID = i.SLABID
   --  );
 END;
+
+
+SELECT 
+    i.name AS IndexName,
+    i.type_desc AS IndexType,
+    COL_NAME(ic.object_id, ic.column_id) AS ColumnName,
+    i.is_primary_key,
+    i.is_unique
+FROM sys.indexes i
+INNER JOIN sys.index_columns ic 
+    ON i.object_id = ic.object_id 
+    AND i.index_id = ic.index_id
+WHERE i.object_id IN (
+    OBJECT_ID('dbo.Slab_Upload_Masters'),
+    OBJECT_ID('dbo.SLAB_LMS_DETAILS')
+)
+ORDER BY i.object_id, i.name, ic.key_ordinal
