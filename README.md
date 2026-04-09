@@ -1,17 +1,15 @@
 SELECT
-    r.session_id,
-    r.blocking_session_id,
-    r.status,
-    r.command,
-    r.wait_type,
-    r.wait_time,
-    r.total_elapsed_time,
+    s.session_id,
+    s.status,
     s.login_name,
     s.host_name,
     s.program_name,
-    st.text AS RunningSQL
-FROM sys.dm_exec_requests r
-INNER JOIN sys.dm_exec_sessions s
-    ON r.session_id = s.session_id
-OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st
-WHERE r.session_id = 67;
+    c.connect_time,
+    c.last_read,
+    c.last_write,
+    st.text AS LastSQL
+FROM sys.dm_exec_sessions s
+LEFT JOIN sys.dm_exec_connections c
+    ON s.session_id = c.session_id
+OUTER APPLY sys.dm_exec_sql_text(c.most_recent_sql_handle) st
+WHERE s.session_id = 67;
