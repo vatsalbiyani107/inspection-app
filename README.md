@@ -1,15 +1,1 @@
-SELECT
-    s.session_id,
-    s.status,
-    s.login_name,
-    s.host_name,
-    s.program_name,
-    c.connect_time,
-    c.last_read,
-    c.last_write,
-    st.text AS LastSQL
-FROM sys.dm_exec_sessions s
-LEFT JOIN sys.dm_exec_connections c
-    ON s.session_id = c.session_id
-OUTER APPLY sys.dm_exec_sql_text(c.most_recent_sql_handle) st
-WHERE s.session_id = 67;
+67	sleeping	L2	JMIAPP01	Microsoft SQL Server JDBC Driver	2026-04-09 17:09:58.713	2026-04-09 17:15:37.797	2026-04-09 17:15:37.800	INSERT INTO SLAB_LMS_DETAILS_L2(SLABID, STEELGRADE, SLABLENGTH, SLABTHICKNESS, SLABWEIGHT, SLABWIDTHHEAD, SLABWIDTHTAIL, ANALYSIS_AE, ANALYSIS_AL, ANALYSIS_AS, ANALYSIS_B, ANALYSIS_BE, ANALYSIS_BI, ANALYSIS_C, ANALYSIS_CA, ANALYSIS_CE, ANALYSIS_CO,  ANALYSIS_CR, ANALYSIS_CU, ANALYSIS_H, ANALYSIS_LA, ANALYSIS_MG, ANALYSIS_MN, ANALYSIS_MO, ANALYSIS_N, ANALYSIS_NB, ANALYSIS_NI, ANALYSIS_O, ANALYSIS_P, ANALYSIS_PB, ANALYSIS_PD, ANALYSIS_S, ANALYSIS_SB, ANALYSIS_SE, ANALYSIS_SI,  ANALYSIS_SN, ANALYSIS_TA, ANALYSIS_TE, ANALYSIS_TI, ANALYSIS_V, ANALYSIS_W, ANALYSIS_ZN, ANALYSIS_ZR, CASTERLINE, HEATNO, STATUS ,SAP_TIME) VALUES( '82600153105','EN 1.4307','12500', '200', '29.390', '1495', '1495', '', '0.0032', '','0.0029', '', '', '0.025', '0.0006', '', '0.23', '18.15', '0.30','7.4', '', '', '1.31', '0.17', '625','0.0020', '8.03', '', '0.041','30', '', '0.003', '', '', '0.24','65', '', '', '0.002', '0.073', '','', '', '1', '82600153', 0,getdate())
