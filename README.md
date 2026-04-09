@@ -1,94 +1,115 @@
 USE [JSL_HSM_DB]
 GO
-
-/****** Object:  Table [dbo].[Slab_Upload_Master_L2]    Script Date: 4/9/2026 2:39:22 PM ******/
+/****** Object:  StoredProcedure [dbo].[Insert_Slab_Master]    Script Date: 4/9/2026 2:42:58 PM ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE TABLE [dbo].[Slab_Upload_Master_L2](
-	[SLABID] [varchar](12) NOT NULL,
-	[Upload_Date] [datetime] NULL,
-	[Status] [int] NULL,
- CONSTRAINT [PK_Slab_Upload_Master_L2] PRIMARY KEY CLUSTERED 
+ALTER PROCEDURE [dbo].[Insert_Slab_Master]
 (
-	[SLABID] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
+    @UploadBatchID VARCHAR(12),
+    @SlabId        VARCHAR(12),
+    @PlateMode     VARCHAR(10),
+    @FurnaceNo     INT,
+    @ColdSlabFlag  VARCHAR(10),
+    @Code          INT OUTPUT,
+    @Msg           VARCHAR(200) OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @Code = 500;
+    SET @Msg  = 'Unknown error';
 
+    -- ✅ PlateMode conversion
+    DECLARE @PlateModeInt INT;
+    SET @PlateModeInt =
+        CASE UPPER(LTRIM(RTRIM(@PlateMode)))
+            WHEN 'LP' THEN 1
+            WHEN 'HP' THEN 2
+            ELSE 0
+        END;
 
-______________________________________________________________________________________________________________________________
+    -- ✅ FurnaceNo validation
+    SET @FurnaceNo = CASE
+        WHEN LTRIM(RTRIM(@FurnaceNo)) = '2' THEN 2
+        ELSE 1
+    END;
 
+    -- ✅ ColdSlabFlag conversion
+    DECLARE @ColdSlabFlagInt INT;
+    SET @ColdSlabFlagInt =
+        CASE UPPER(LTRIM(RTRIM(@ColdSlabFlag)))
+            WHEN 'HOT'  THEN 1
+            WHEN 'COLD' THEN 0
+            ELSE 0
+        END;
 
+    -- ✅ Validation: SlabId must be exactly 11 characters
+    IF LEN(LTRIM(RTRIM(@SlabId))) <> 11
+    BEGIN
+        SET @Code = 400;
+        SET @Msg  = 'SlabId must be exactly 11 characters';
+        RETURN;
+    END
 
-USE [JSL_HSM_DB]
-GO
+    -- ✅ Duplicate check in active slabs table
+    IF EXISTS (SELECT 1 FROM dbo.Slab_Upload_Masters WHERE SlabID = @SlabId)
+    BEGIN
+        SET @Code = 409;
+        SET @Msg  = 'SlabId already exists in active slabs';
+        RETURN;
+    END
 
-/****** Object:  Table [dbo].[SLAB_LMS_DETAILS_L2]    Script Date: 4/9/2026 2:39:48 PM ******/
-SET ANSI_NULLS ON
-GO
+    -- ✅ Duplicate check in history table
+    IF EXISTS (SELECT 1 FROM dbo.PIKE_HISTORY WHERE SlabID = @SlabId)
+    BEGIN
+        SET @Code = 409;
+        SET @Msg  = 'SlabId already exists in history';
+        RETURN;
+    END
 
-SET QUOTED_IDENTIFIER ON
-GO
+    -- ✅ Step 1: Local insert inside transaction
+    BEGIN TRY
+        BEGIN TRANSACTION;
+            INSERT INTO dbo.Slab_Upload_Masters
+            (UploadBatchID, Upload_Date, SlabID, PlateMode, FurnaceNo, ColdSlabFlag, Status)
+            VALUES
+            (@UploadBatchID, SYSDATETIME(), @SlabId, @PlateModeInt, @FurnaceNo, @ColdSlabFlagInt, 0);
 
-CREATE TABLE [dbo].[SLAB_LMS_DETAILS_L2](
-	[SLABID] [varchar](12) NOT NULL,
-	[STEELGRADE] [varchar](70) NOT NULL,
-	[SLABLENGTH] [varchar](70) NULL,
-	[SLABTHICKNESS] [varchar](70) NULL,
-	[SLABWEIGHT] [varchar](70) NULL,
-	[SLABWIDTHHEAD] [varchar](70) NULL,
-	[SLABWIDTHTAIL] [varchar](70) NULL,
-	[ANALYSIS_AE] [varchar](22) NULL,
-	[ANALYSIS_AL] [varchar](22) NULL,
-	[ANALYSIS_AS] [varchar](22) NULL,
-	[ANALYSIS_B] [varchar](22) NULL,
-	[ANALYSIS_BE] [varchar](22) NULL,
-	[ANALYSIS_BI] [varchar](22) NULL,
-	[ANALYSIS_C] [varchar](22) NULL,
-	[ANALYSIS_CA] [varchar](22) NULL,
-	[ANALYSIS_CE] [varchar](22) NULL,
-	[ANALYSIS_CO] [varchar](22) NULL,
-	[ANALYSIS_CR] [varchar](22) NULL,
-	[ANALYSIS_CU] [varchar](22) NULL,
-	[ANALYSIS_H] [varchar](22) NULL,
-	[ANALYSIS_LA] [varchar](22) NULL,
-	[ANALYSIS_MG] [varchar](22) NULL,
-	[ANALYSIS_MN] [varchar](22) NULL,
-	[ANALYSIS_MO] [varchar](22) NULL,
-	[ANALYSIS_N] [varchar](22) NULL,
-	[ANALYSIS_NB] [varchar](22) NULL,
-	[ANALYSIS_NI] [varchar](22) NULL,
-	[ANALYSIS_O] [varchar](22) NULL,
-	[ANALYSIS_P] [varchar](22) NULL,
-	[ANALYSIS_PB] [varchar](22) NULL,
-	[ANALYSIS_PD] [varchar](22) NULL,
-	[ANALYSIS_S] [varchar](22) NULL,
-	[ANALYSIS_SB] [varchar](22) NULL,
-	[ANALYSIS_SE] [varchar](22) NULL,
-	[ANALYSIS_SI] [varchar](22) NULL,
-	[ANALYSIS_SN] [varchar](22) NULL,
-	[ANALYSIS_TA] [varchar](22) NULL,
-	[ANALYSIS_TE] [varchar](22) NULL,
-	[ANALYSIS_TI] [varchar](22) NULL,
-	[ANALYSIS_V] [varchar](22) NULL,
-	[ANALYSIS_W] [varchar](22) NULL,
-	[ANALYSIS_ZN] [varchar](22) NULL,
-	[ANALYSIS_ZR] [varchar](22) NULL,
-	[CASTERLINE] [varchar](22) NULL,
-	[HEATNO] [varchar](70) NULL,
-	[STATUS] [int] NOT NULL,
-	[READ_TIME] [datetime] NULL,
-	[SAP_TIME] [datetime] NULL,
- CONSTRAINT [PK_SLAB_LMS_DETAILS_L2] PRIMARY KEY CLUSTERED 
-(
-	[SLABID] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
+			INSERT INTO [dbo].[Slab_Upload_Master_L2]
+			(SlabID, Upload_Date, Status)
+			values
+			(@SlabId, SYSDATETIME(), 1);
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        SET @Code = 500;
+        SET @Msg  = ERROR_MESSAGE();
+        RETURN;
+    END CATCH
 
+    -- ✅ Step 2: Remote insert OUTSIDE transaction
+    -- Local is already committed — remote failure will not affect it
+   /* BEGIN TRY
+        IF NOT EXISTS (
+            SELECT 1 FROM [10.7.82.180].[HSM_LMS_DB].[dbo].[Slab_Upload_Master] WITH (NOLOCK)
+            WHERE SlabID = @SlabId
+        )
+        BEGIN
+            INSERT INTO [10.7.82.180].[HSM_LMS_DB].[dbo].[Slab_Upload_Master] 
+            (SlabID, Upload_Date, Status)
+            VALUES (@SlabId, GETDATE(), 1);
+        END
+    END TRY
+    BEGIN CATCH
+        -- Remote insert failed — local is already saved safely
+        -- Optionally log: INSERT INTO dbo.SyncErrors (SlabID, ErrorMsg) VALUES (@SlabId, ERROR_MESSAGE())
+    END CATCH*/
 
-
+    SET @Code = 200;
+    SET @Msg  = 'Slab inserted successfully';
+END
