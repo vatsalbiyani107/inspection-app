@@ -1,51 +1,46 @@
 SELECT
-    r.session_id,
-    r.blocking_session_id,
+    r.session_id                     AS BlockedSessionID,
+    r.blocking_session_id            AS BlockingSessionID,
 
-    s.status AS session_status,
-    r.status AS request_status,
+    bs.login_name                    AS BlockedLogin,
+    bs.host_name                     AS BlockedHost,
+    bs.program_name                  AS BlockedProgram,
 
-    r.command,
+    bls.login_name                   AS BlockingLogin,
+    bls.host_name                    AS BlockingHost,
+    bls.program_name                 AS BlockingProgram,
+
+    r.status                         AS BlockedRequestStatus,
+    r.command                        AS BlockedCommand,
     r.wait_type,
     r.wait_time,
-    r.last_wait_type,
-    r.cpu_time,
     r.total_elapsed_time,
 
-    DB_NAME(r.database_id) AS DatabaseName,
+    bat.transaction_begin_time       AS BlockingTransactionBeginTime,
+    bat.transaction_state            AS BlockingTransactionState,
 
-    s.login_name,
-    s.host_name,
-    s.program_name,
-
-    -- transaction info
-    at.transaction_begin_time,
-    at.transaction_state,
-
-    -- SQL text
-    st.text AS RunningSQL
+    blocked_sql.text                 AS BlockedSQL,
+    blocking_sql.text                AS BlockingSQL
 
 FROM sys.dm_exec_requests r
+INNER JOIN sys.dm_exec_sessions bs
+    ON r.session_id = bs.session_id
+LEFT JOIN sys.dm_exec_sessions bls
+    ON r.blocking_session_id = bls.session_id
 
-INNER JOIN sys.dm_exec_sessions s
-    ON r.session_id = s.session_id
+LEFT JOIN sys.dm_tran_session_transactions bst
+    ON bls.session_id = bst.session_id
+LEFT JOIN sys.dm_tran_active_transactions bat
+    ON bst.transaction_id = bat.transaction_id
 
-LEFT JOIN sys.dm_tran_session_transactions tst
-    ON r.session_id = tst.session_id
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) blocked_sql
+OUTER APPLY
+(
+    SELECT c.most_recent_sql_handle
+    FROM sys.dm_exec_connections c
+    WHERE c.session_id = r.blocking_session_id
+) bhandle
+OUTER APPLY sys.dm_exec_sql_text(bhandle.most_recent_sql_handle) blocking_sql
 
-LEFT JOIN sys.dm_tran_active_transactions at
-    ON tst.transaction_id = at.transaction_id
-
-OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st
-
-WHERE
-    r.blocking_session_id <> 0
-    OR r.session_id IN (
-        SELECT blocking_session_id
-        FROM sys.dm_exec_requests
-        WHERE blocking_session_id <> 0
-    )
-
-ORDER BY
-    r.blocking_session_id DESC,
-    r.session_id;
+WHERE r.blocking_session_id <> 0
+ORDER BY r.blocking_session_id, r.session_id;
