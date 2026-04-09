@@ -1,2 +1,51 @@
-TriggerName	definition
-TRG_L2_To_LMS_Details	  CREATE   TRIGGER [dbo].[TRG_L2_To_LMS_Details] ON [dbo].[SLAB_LMS_DETAILS_L2]   AFTER INSERT AS   BEGIN   SET NOCOUNT ON;    -- ── Step 1: Insert into SLAB_LMS_DETAILS ─────────────────────────────────  -- Conditions:  --   1. SLABID exists in Slab_Upload_Masters  --   2. Not already in SLAB_LMS_DETAILS  --   3. STATUS = 0 only (STATUS = 1 means already processed, skip)  INSERT INTO [dbo].[SLAB_LMS_DETAILS]  (      SLABID, STEELGRADE, SLABLENGTH, SLABTHICKNESS, SLABWEIGHT,      SLABWIDTHHEAD, SLABWIDTHTAIL,      ANALYSIS_AE, ANALYSIS_AL, ANALYSIS_AS, ANALYSIS_B, ANALYSIS_BE,      ANALYSIS_BI, ANALYSIS_C, ANALYSIS_CA, ANALYSIS_CE, ANALYSIS_CO,      ANALYSIS_CR, ANALYSIS_CU, ANALYSIS_H, ANALYSIS_LA, ANALYSIS_MG,      ANALYSIS_MN, ANALYSIS_MO, ANALYSIS_N, ANALYSIS_NB, ANALYSIS_NI,      ANALYSIS_O, ANALYSIS_P, ANALYSIS_PB, ANALYSIS_PD, ANALYSIS_S,      ANALYSIS_SB, ANALYSIS_SE, ANALYSIS_SI, ANALYSIS_SN, ANALYSIS_TA,      ANALYSIS_TE, ANALYSIS_TI, ANALYSIS_V, ANALYSIS_W, ANALYSIS_ZN,      ANALYSIS_ZR, CASTERLINE, HEATNO, STATUS, READ_TIME  )  SELECT      i.SLABID, i.STEELGRADE, i.SLABLENGTH, i.SLABTHICKNESS, i.SLABWEIGHT,      i.SLABWIDTHHEAD, i.SLABWIDTHTAIL,      i.ANALYSIS_AE, i.ANALYSIS_AL, i.ANALYSIS_AS, i.ANALYSIS_B, i.ANALYSIS_BE,      i.ANALYSIS_BI, i.ANALYSIS_C, i.ANALYSIS_CA, i.ANALYSIS_CE, i.ANALYSIS_CO,      i.ANALYSIS_CR, i.ANALYSIS_CU, i.ANALYSIS_H, i.ANALYSIS_LA, i.ANALYSIS_MG,      i.ANALYSIS_MN, i.ANALYSIS_MO, i.ANALYSIS_N, i.ANALYSIS_NB, i.ANALYSIS_NI,      i.ANALYSIS_O, i.ANALYSIS_P, i.ANALYSIS_PB, i.ANALYSIS_PD, i.ANALYSIS_S,      i.ANALYSIS_SB, i.ANALYSIS_SE, i.ANALYSIS_SI, i.ANALYSIS_SN, i.ANALYSIS_TA,      i.ANALYSIS_TE, i.ANALYSIS_TI, i.ANALYSIS_V, i.ANALYSIS_W, i.ANALYSIS_ZN,      i.ANALYSIS_ZR, i.CASTERLINE, i.HEATNO, i.STATUS, i.READ_TIME  FROM inserted i  INNER JOIN dbo.Slab_Upload_Masters um      ON um.SLABID = i.SLABID  WHERE i.STATUS = 0                          -- skip already processed rows  AND NOT EXISTS (      SELECT 1 FROM dbo.SLAB_LMS_DETAILS d      WHERE d.SLABID = i.SLABID  );    -- ── Step 2: Update STATUS = 1 in SLAB_LMS_DETAILS_L2 ────────────────────  -- Only for rows that were matched and inserted  UPDATE l2  SET l2.STATUS = 1  FROM dbo.SLAB_LMS_DETAILS_L2 l2  INNER JOIN inserted i ON i.SLABID = l2.SLABID  INNER JOIN dbo.Slab_Upload_Masters um ON um.SLABID = i.SLABID  WHERE i.STATUS = 0                          -- skip already processed rows  END;   
+SELECT
+    r.session_id,
+    r.blocking_session_id,
+
+    s.status AS session_status,
+    r.status AS request_status,
+
+    r.command,
+    r.wait_type,
+    r.wait_time,
+    r.last_wait_type,
+    r.cpu_time,
+    r.total_elapsed_time,
+
+    DB_NAME(r.database_id) AS DatabaseName,
+
+    s.login_name,
+    s.host_name,
+    s.program_name,
+
+    -- transaction info
+    at.transaction_begin_time,
+    at.transaction_state,
+
+    -- SQL text
+    st.text AS RunningSQL
+
+FROM sys.dm_exec_requests r
+
+INNER JOIN sys.dm_exec_sessions s
+    ON r.session_id = s.session_id
+
+LEFT JOIN sys.dm_tran_session_transactions tst
+    ON r.session_id = tst.session_id
+
+LEFT JOIN sys.dm_tran_active_transactions at
+    ON tst.transaction_id = at.transaction_id
+
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st
+
+WHERE
+    r.blocking_session_id <> 0
+    OR r.session_id IN (
+        SELECT blocking_session_id
+        FROM sys.dm_exec_requests
+        WHERE blocking_session_id <> 0
+    )
+
+ORDER BY
+    r.blocking_session_id DESC,
+    r.session_id;
