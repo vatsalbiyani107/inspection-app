@@ -1,5 +1,22 @@
-session_id	status	login_name	host_name	program_name	transaction_begin_time	transaction_state	LastSQL
-67	sleeping	L2	JMIAPP01	Microsoft SQL Server JDBC Driver	2026-04-09 17:10:37.397	2	INSERT INTO SLAB_LMS_DETAILS_L2(SLABID, STEELGRADE, SLABLENGTH, SLABTHICKNESS, SLABWEIGHT, SLABWIDTHHEAD, SLABWIDTHTAIL, ANALYSIS_AE, ANALYSIS_AL, ANALYSIS_AS, ANALYSIS_B, ANALYSIS_BE, ANALYSIS_BI, ANALYSIS_C, ANALYSIS_CA, ANALYSIS_CE, ANALYSIS_CO,  ANALYSIS_CR, ANALYSIS_CU, ANALYSIS_H, ANALYSIS_LA, ANALYSIS_MG, ANALYSIS_MN, ANALYSIS_MO, ANALYSIS_N, ANALYSIS_NB, ANALYSIS_NI, ANALYSIS_O, ANALYSIS_P, ANALYSIS_PB, ANALYSIS_PD, ANALYSIS_S, ANALYSIS_SB, ANALYSIS_SE, ANALYSIS_SI,  ANALYSIS_SN, ANALYSIS_TA, ANALYSIS_TE, ANALYSIS_TI, ANALYSIS_V, ANALYSIS_W, ANALYSIS_ZN, ANALYSIS_ZR, CASTERLINE, HEATNO, STATUS ,SAP_TIME) VALUES( '82600153105','EN 1.4307','12500', '200', '29.390', '1495', '1495', '', '0.0032', '','0.0029', '', '', '0.025', '0.0006', '', '0.23', '18.15', '0.30','7.4', '', '', '1.31', '0.17', '625','0.0020', '8.03', '', '0.041','30', '', '0.003', '', '', '0.24','65', '', '', '0.002', '0.073', '','', '', '1', '82600153', 0,getdate())
-87	running	L2	JMIAPP01	Microsoft SQL Server JDBC Driver	2026-04-09 17:10:37.407	2	(@1 int,@2 varchar(8000),@3 tinyint)UPDATE [SLAB_LMS_DETAILS_L2] set [STATUS] = @1  WHERE [SLABID]=@2 AND [STATUS]=@3
-93	running	L2	JMIAPP02	Microsoft SQL Server JDBC Driver	2026-04-09 17:10:42.640	2	(@1 varchar(8000),@2 varchar(8000),@3 varchar(8000),@4 varchar(8000),@5 varchar(8000),@6 varchar(8000),@7 varchar(8000),@8 varchar(8000),@9 varchar(8000),@10 varchar(8000),@11 varchar(8000),@12 varchar(8000),@13 varchar(8000),@14 varchar(8000),@15 varchar(8000),@16 varchar(8000),@17 varchar(8000),@18 varchar(8000),@19 varchar(8000),@20 varchar(8000),@21 varchar(8000),@22 varchar(8000),@23 varchar(8000),@24 varchar(8000),@25 varchar(8000),@26 varchar(8000),@27 varchar(8000),@28 varchar(8000),@29 varchar(8000),@30 varchar(8000),@31 varchar(8000),@32 varchar(8000),@33 varchar(8000),@34 varchar(8000),@35 varchar(8000),@36 varchar(8000),@37 varchar(8000),@38 varchar(8000),@39 varchar(8000),@40 varchar(8000),@41 varchar(8000),@42 varchar(8000),@43 varchar(8000),@44 varchar(8000),@45 varchar(8000),@46 int)INSERT INTO [SLAB_LMS_DETAILS_L2]([SLABID],[STEELGRADE],[SLABLENGTH],[SLABTHICKNESS],[SLABWEIGHT],[SLABWIDTHHEAD],[SLABWIDTHTAIL],[ANALYSIS_AE],[ANALYSIS_AL],[ANALYSIS_AS],[ANALYSIS_B],[ANALYSIS_BE],[ANALYSIS_BI],[ANALYSIS_C],[ANALYSIS_CA],[ANALYSIS_CE],[ANALYSIS_CO],[ANALYSIS_CR],[ANALYSIS_CU],[ANALYSIS_H],[ANALYSIS_LA],[ANALYSIS_MG],[ANALYSIS_MN],[ANALYSIS_MO],[ANALYSIS_N],[ANALYSIS_NB],[ANALYSIS_NI],[ANALYSIS_O],[ANALYSIS_P],[ANALYSIS_PB],[ANALYSIS_PD],[ANALYSIS_S],[ANALYSIS_SB],[ANALYSIS_SE],[ANALYSIS_SI],[ANALYSIS_SN],[ANALYSIS_TA],[ANALYSIS_TE],[ANALYSIS_TI],[ANALYSIS_V],[ANALYSIS_W],[ANALYSIS_ZN],[ANALYSIS_ZR],[CASTERLINE],[HEATNO],[STATUS],[SAP_TIME]) values(@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14,@15,@16,@17,@18,@19,@20,@21,@22,@23,@24,@25,@26,@27,@28,@29,@30,@31,@32,@33,@34,@35,@36,@37,@38,@39,@40,@41,@42,@43,@44,@45,@46,getdate())
-88	sleeping	L2	JMIAPP02	Microsoft SQL Server JDBC Driver	2026-04-09 17:17:36.920	2	INSERT INTO SLAB_LMS_DETAILS_L2(SLABID, STEELGRADE, SLABLENGTH, SLABTHICKNESS, SLABWEIGHT, SLABWIDTHHEAD, SLABWIDTHTAIL, ANALYSIS_AE, ANALYSIS_AL, ANALYSIS_AS, ANALYSIS_B, ANALYSIS_BE, ANALYSIS_BI, ANALYSIS_C, ANALYSIS_CA, ANALYSIS_CE, ANALYSIS_CO,  ANALYSIS_CR, ANALYSIS_CU, ANALYSIS_H, ANALYSIS_LA, ANALYSIS_MG, ANALYSIS_MN, ANALYSIS_MO, ANALYSIS_N, ANALYSIS_NB, ANALYSIS_NI, ANALYSIS_O, ANALYSIS_P, ANALYSIS_PB, ANALYSIS_PD, ANALYSIS_S, ANALYSIS_SB, ANALYSIS_SE, ANALYSIS_SI,  ANALYSIS_SN, ANALYSIS_TA, ANALYSIS_TE, ANALYSIS_TI, ANALYSIS_V, ANALYSIS_W, ANALYSIS_ZN, ANALYSIS_ZR, CASTERLINE, HEATNO, STATUS ,SAP_TIME) VALUES( '82600136201','EN 1.4307','11300', '200', '22.590', '1265', '1265', '', '0.0020', '','0.0028', '', '', '0.021', '0.0006', '', '0.20', '18.05', '0.65','6.8', '', '', '1.56', '0.30', '640','0.010', '8.05', '', '0.039','38', '', '0.0020', '', '', '0.31','135', '', '', '0.002', '0.080', '','', '', '2', '82600136', 0,getdate())
+SELECT
+    r.session_id,
+    r.blocking_session_id,
+    r.status,
+    r.command,
+    r.wait_type,
+    r.wait_time,
+    s.login_name,
+    s.host_name,
+    s.program_name,
+    st.text AS RunningSQL
+FROM sys.dm_exec_requests r
+INNER JOIN sys.dm_exec_sessions s
+    ON r.session_id = s.session_id
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st
+WHERE r.blocking_session_id <> 0
+   OR r.session_id IN
+   (
+       SELECT blocking_session_id
+       FROM sys.dm_exec_requests
+       WHERE blocking_session_id <> 0
+   );
