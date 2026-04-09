@@ -1,2 +1,7 @@
-IX_LMS_L2_STATUS	nonclustered located on PRIMARY	STATUS
-PK_SLAB_LMS_DETAILS_L2	clustered, unique, primary key located on PRIMARY	SLABID
+SELECT
+    t.name AS TriggerName,
+    m.definition
+FROM sys.triggers t
+INNER JOIN sys.sql_modules m
+    ON t.object_id = m.object_id
+WHERE m.definition LIKE '%SLAB_LMS_DETAILS_L2%';
