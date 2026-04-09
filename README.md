@@ -193,3 +193,9 @@ WHERE i.object_id IN (
     OBJECT_ID('dbo.SLAB_LMS_DETAILS')
 )
 ORDER BY i.object_id, i.name, ic.key_ordinal
+
+
+
+
+PK__Slab_Upl__6D16C86D9E0CBADB	CLUSTERED	UploadID	1	1
+PK_SLAB_LMS_DETAILS	CLUSTERED	SLABID	1	1
