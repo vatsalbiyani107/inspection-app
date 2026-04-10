@@ -1,30 +1,177 @@
-SELECT
-    r.session_id                     AS BlockedSessionID,
-    r.blocking_session_id            AS BlockingSessionID,
-    bs.login_name                    AS BlockedLogin,
-    bs.host_name                     AS BlockedHost,
-    bs.program_name                  AS BlockedProgram,
-    bls.login_name                   AS BlockingLogin,
-    bls.host_name                    AS BlockingHost,
-    bls.program_name                 AS BlockingProgram,
-    r.status                         AS BlockedRequestStatus,
-    r.command                        AS BlockedCommand,
-    r.wait_type,
-    r.wait_time,
-    blocked_sql.text                 AS BlockedSQL,
-    blocking_sql.text                AS BlockingSQL
-FROM sys.dm_exec_requests r
-INNER JOIN sys.dm_exec_sessions bs
-    ON r.session_id = bs.session_id
-LEFT JOIN sys.dm_exec_sessions bls
-    ON r.blocking_session_id = bls.session_id
-OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) blocked_sql
-OUTER APPLY
+USE [JSL_HSM_DB]
+GO
+/****** Object:  Trigger [dbo].[TRG_L2_To_LMS_Details]    Script Date: 4/10/2026 10:17:03 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER   TRIGGER [dbo].[TRG_L2_To_LMS_Details] ON [dbo].[SLAB_LMS_DETAILS_L2] 
+AFTER INSERT AS 
+BEGIN 
+SET NOCOUNT ON;
+
+-- ── Step 1: Insert into SLAB_LMS_DETAILS ─────────────────────────────────
+-- Conditions:
+--   1. SLABID exists in Slab_Upload_Masters
+--   2. Not already in SLAB_LMS_DETAILS
+--   3. STATUS = 0 only (STATUS = 1 means already processed, skip)
+INSERT INTO [dbo].[SLAB_LMS_DETAILS]
 (
-    SELECT c.most_recent_sql_handle
-    FROM sys.dm_exec_connections c
-    WHERE c.session_id = r.blocking_session_id
-) bhandle
-OUTER APPLY sys.dm_exec_sql_text(bhandle.most_recent_sql_handle) blocking_sql
-WHERE r.blocking_session_id <> 0
-ORDER BY r.blocking_session_id, r.session_id;
+    SLABID, STEELGRADE, SLABLENGTH, SLABTHICKNESS, SLABWEIGHT,
+    SLABWIDTHHEAD, SLABWIDTHTAIL,
+    ANALYSIS_AE, ANALYSIS_AL, ANALYSIS_AS, ANALYSIS_B, ANALYSIS_BE,
+    ANALYSIS_BI, ANALYSIS_C, ANALYSIS_CA, ANALYSIS_CE, ANALYSIS_CO,
+    ANALYSIS_CR, ANALYSIS_CU, ANALYSIS_H, ANALYSIS_LA, ANALYSIS_MG,
+    ANALYSIS_MN, ANALYSIS_MO, ANALYSIS_N, ANALYSIS_NB, ANALYSIS_NI,
+    ANALYSIS_O, ANALYSIS_P, ANALYSIS_PB, ANALYSIS_PD, ANALYSIS_S,
+    ANALYSIS_SB, ANALYSIS_SE, ANALYSIS_SI, ANALYSIS_SN, ANALYSIS_TA,
+    ANALYSIS_TE, ANALYSIS_TI, ANALYSIS_V, ANALYSIS_W, ANALYSIS_ZN,
+    ANALYSIS_ZR, CASTERLINE, HEATNO, STATUS, READ_TIME
+)
+SELECT
+    i.SLABID, i.STEELGRADE, i.SLABLENGTH, i.SLABTHICKNESS, i.SLABWEIGHT,
+    i.SLABWIDTHHEAD, i.SLABWIDTHTAIL,
+    i.ANALYSIS_AE, i.ANALYSIS_AL, i.ANALYSIS_AS, i.ANALYSIS_B, i.ANALYSIS_BE,
+    i.ANALYSIS_BI, i.ANALYSIS_C, i.ANALYSIS_CA, i.ANALYSIS_CE, i.ANALYSIS_CO,
+    i.ANALYSIS_CR, i.ANALYSIS_CU, i.ANALYSIS_H, i.ANALYSIS_LA, i.ANALYSIS_MG,
+    i.ANALYSIS_MN, i.ANALYSIS_MO, i.ANALYSIS_N, i.ANALYSIS_NB, i.ANALYSIS_NI,
+    i.ANALYSIS_O, i.ANALYSIS_P, i.ANALYSIS_PB, i.ANALYSIS_PD, i.ANALYSIS_S,
+    i.ANALYSIS_SB, i.ANALYSIS_SE, i.ANALYSIS_SI, i.ANALYSIS_SN, i.ANALYSIS_TA,
+    i.ANALYSIS_TE, i.ANALYSIS_TI, i.ANALYSIS_V, i.ANALYSIS_W, i.ANALYSIS_ZN,
+    i.ANALYSIS_ZR, i.CASTERLINE, i.HEATNO, i.STATUS, i.READ_TIME
+FROM inserted i
+INNER JOIN dbo.Slab_Upload_Masters um
+    ON um.SLABID = i.SLABID
+WHERE i.STATUS = 0                          -- skip already processed rows
+AND NOT EXISTS (
+    SELECT 1 FROM dbo.SLAB_LMS_DETAILS d
+    WHERE d.SLABID = i.SLABID
+);
+
+-- ── Step 2: Update STATUS = 1 in SLAB_LMS_DETAILS_L2 ────────────────────
+-- Only for rows that were matched and inserted
+UPDATE l2
+SET l2.STATUS = 1
+FROM dbo.SLAB_LMS_DETAILS_L2 l2
+INNER JOIN inserted i ON i.SLABID = l2.SLABID
+INNER JOIN dbo.Slab_Upload_Masters um ON um.SLABID = i.SLABID
+WHERE i.STATUS = 0                          -- skip already processed rows
+END; 
+
+
+----------------------------------------------------------------------------------------------------------------------------
+LMS to pike stores 
+
+USE [JSL_HSM_DB]
+GO
+/****** Object:  Trigger [dbo].[TRG_Insert_LMS_To_PikeStore]    Script Date: 4/10/2026 10:17:56 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER TRIGGER [dbo].[TRG_Insert_LMS_To_PikeStore]
+ON [dbo].[SLAB_LMS_DETAILS]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO dbo.SLAB_LMS_DETAILS_PikeStoresData
+    (
+        SLABID, STEELGRADE, SLABLENGTH, SLABTHICKNESS, SLABWEIGHT,
+        SLABWIDTHHEAD, SLABWIDTHTAIL,
+        ANALYSIS_AE, ANALYSIS_AL, ANALYSIS_AS, ANALYSIS_B, ANALYSIS_BE,
+        ANALYSIS_BI, ANALYSIS_C, ANALYSIS_CA, ANALYSIS_CE, ANALYSIS_CO,
+        ANALYSIS_CR, ANALYSIS_CU, ANALYSIS_H, ANALYSIS_LA, ANALYSIS_MG,
+        ANALYSIS_MN, ANALYSIS_MO, ANALYSIS_N, ANALYSIS_NB, ANALYSIS_NI,
+        ANALYSIS_O, ANALYSIS_P, ANALYSIS_PB, ANALYSIS_PD, ANALYSIS_S,
+        ANALYSIS_SB, ANALYSIS_SE, ANALYSIS_SI, ANALYSIS_SN, ANALYSIS_TA,
+        ANALYSIS_TE, ANALYSIS_TI, ANALYSIS_V, ANALYSIS_W, ANALYSIS_ZN,
+        ANALYSIS_ZR,
+        CASTERLINE, HEATNO, PlateMode, FurnaceNo, ColdSlabFlag,
+        UploadBatchID, STATUS, READ_TIME
+    )
+    SELECT
+        i.SLABID,
+        COALESCE(m.Level2Grade, i.STEELGRADE) AS STEELGRADE,
+        ISNULL(FORMAT(CAST(NULLIF(LTRIM(RTRIM(i.SLABLENGTH)), '') AS FLOAT) / 1000, 'F1'), '0'),
+        NULLIF(LTRIM(RTRIM(i.SLABTHICKNESS)), ''),
+        ISNULL(FORMAT(CAST(NULLIF(LTRIM(RTRIM(i.SLABWEIGHT)), '') AS FLOAT) * 1000, 'F0'), '0'),
+        NULLIF(LTRIM(RTRIM(i.SLABWIDTHHEAD)), ''),
+        NULLIF(LTRIM(RTRIM(i.SLABWIDTHTAIL)), ''),
+        ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_AE)), '') AS FLOAT), 0),
+        ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_AL)), '') AS FLOAT), 0),
+        ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_AS)), '') AS FLOAT), 0),
+        ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_B)),  '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_BE)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_BI)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_C)),  '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_CA)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_CE)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_CO)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_CR)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_CU)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_H)),  '') AS FLOAT), 0),
+		--ISNULL(ROUND(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_H)), '') AS FLOAT), 0), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_LA)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_MG)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_MN)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_MO)), '') AS FLOAT), 0),
+
+		-- N (divide by 10000)
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_N)),  '') AS FLOAT) / 10000, 0),
+
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_NB)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_NI)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_O)),  '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_P)),  '') AS FLOAT), 0),
+
+		-- PB (divide by 10000)
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_PB)), '') AS FLOAT) / 10000, 0),
+
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_PD)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_S)),  '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_SB)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_SE)), '') AS FLOAT), 0),
+	    ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_SI)), '') AS FLOAT), 0),
+	
+		-- SN (divide by 10000)
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_SN)), '') AS FLOAT) / 10000, 0),
+
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_TA)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_TE)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_TI)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_V)),  '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_W)),  '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_ZN)), '') AS FLOAT), 0),
+		ISNULL(CAST(NULLIF(LTRIM(RTRIM(i.ANALYSIS_ZR)), '') AS FLOAT), 0),
+        i.CASTERLINE,
+        i.HEATNO,
+        um.PlateMode,
+        um.FurnaceNo,
+        um.ColdSlabFlag,
+        um.UploadBatchID,
+        i.STATUS,
+        getDate() AS READ_TIME
+    FROM inserted i
+    INNER JOIN dbo.SLAB_Upload_Masters um
+        ON um.SLABID = i.SLABID
+  --  LEFT JOIN dbo.SAP_Data_Mapping m
+  --      ON m.SAPGrade = i.STEELGRADE
+  LEFT JOIN dbo.SAP_Data_Mapping m
+    ON m.SlNo = (
+        SELECT TOP 1 SlNo 
+       FROM dbo.SAP_Data_Mapping 
+        WHERE SAPGrade = i.STEELGRADE 
+        ORDER BY SlNo ASC
+   )
+ --LEFT JOIN dbo.SAP_Data_Mapping m
+  --  ON m.SAPGrade = CAST(i.STEELGRADE AS NVARCHAR(50))
+
+  --  WHERE NOT EXISTS
+  --  (
+   ----     SELECT 1
+   --     FROM dbo.SLAB_LMS_DETAILS_PikeStoresData p
+   --     WHERE p.SLABID = i.SLABID
+  --  );
+END;
